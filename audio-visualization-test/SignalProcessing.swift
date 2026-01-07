@@ -63,8 +63,4 @@ class SignalProcessing {
         
         return normalizedMagnitudes
     }
-    
-    static func rotationAngle() {
-        
-    }
 }

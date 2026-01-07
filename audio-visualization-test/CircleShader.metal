@@ -8,6 +8,7 @@ struct LoudnessUniform {
 };
 
 struct RotationUniform {
+    float angle;
     matrix_float2x2 rotationMatrix;
 };
 
@@ -25,7 +26,7 @@ vertex VertexOut vertexShader(const constant vector_float2 *vertexArray [[buffer
     RotationUniform rotationUniformVertex = rotationUniform[0];
     
     vector_float2 currentVertex = vertexArray[vid];
-    currentVertex = currentVertex * loudnessUniformVertex.scale;
+    currentVertex = rotationUniformVertex.rotationMatrix * currentVertex * loudnessUniformVertex.scale;
     currentVertex.x /= loudnessUniformVertex.aspectRatio;
         
     VertexOut output;

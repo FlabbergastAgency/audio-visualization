@@ -15,8 +15,8 @@ struct RotationUniform {
         self.angle = angle
         self.rotationMatrix = matrix_float2x2(
             columns: (
-                simd_float2(cos(Float.pi / 2), sin(Float.pi / 2)),
-                simd_float2(-sin(Float.pi / 2), cos(Float.pi / 2))
+                simd_float2(cos(angle), sin(angle)),
+                simd_float2(-sin(angle), cos(angle))
             )
         )
     }
@@ -142,9 +142,7 @@ extension AudioVisualizer: MTKViewDelegate {
             &rotation,
             MemoryLayout<RotationUniform>.stride
         )
-        
-        print(rotation.angle, rotation.rotationMatrix)
-        
+
         guard let commandBuffer = metalCommandQueue.makeCommandBuffer() else { return }
         
         guard let renderDescriptor = view.currentRenderPassDescriptor else { return }
