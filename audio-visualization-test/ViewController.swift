@@ -10,6 +10,10 @@ class ViewController: UIViewController {
     
     let fftSetup = vDSP_DFT_zop_CreateSetup(nil, 2048, vDSP_DFT_Direction.FORWARD)
     
+    var targetFftMagnitudes: [Float] = []
+    var smoothedFftMagnitudes: [Float] = []
+    let smoothing: Float = 0.4
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         audioVisualizer = AudioVisualizer()
@@ -35,7 +39,7 @@ class ViewController: UIViewController {
             print(error)
         }
         
-        guard let url = Bundle.main.url(forResource: Songs.veridisQuo.rawValue, withExtension: "mp3") else {
+        guard let url = Bundle.main.url(forResource: Songs.losingMyReligion.rawValue, withExtension: "mp3") else {
             print("mp3 not found")
             return
         }
@@ -65,19 +69,25 @@ class ViewController: UIViewController {
         guard let channelData = buffer.floatChannelData?[0] else { return }
         let frames = buffer.frameLength
         
-        let fftMagnitudes = SignalProcessing.fft(
+        targetFftMagnitudes = SignalProcessing.fft(
             data: channelData,
             setup: fftSetup!
         )
         
+        if (smoothedFftMagnitudes.isEmpty) {
+            smoothedFftMagnitudes = targetFftMagnitudes
+        }
+        
         let loFrequency: Int = 0
         let hiFrequency: Int = 1023
-        let frequencyBand = Array(fftMagnitudes[loFrequency...hiFrequency])
+        let frequencyBand = Array(targetFftMagnitudes[loFrequency...hiFrequency])
         
         let rmsValue = SignalProcessing.rms(data: frequencyBand, frameLength: UInt(frames))
+        
+        
         audioVisualizer.targetScale = rmsValue
         
-        let count = min(fftMagnitudes.count,
+        let count = min(targetFftMagnitudes.count,
                         self.audioVisualizer.frequencyVertices.count)
 
         let ptr = audioVisualizer.frequencyBuffer.contents().bindMemory(to: simd_float2.self,
@@ -85,12 +95,22 @@ class ViewController: UIViewController {
 
         for i in 0..<count {
             let angle = Float(i) * 2 * .pi / Float(count)
-            let radius = 1.0 + fftMagnitudes[i]
+            let radius: Float
+            
+            smoothedFftMagnitudes[i] += (targetFftMagnitudes[i] - smoothedFftMagnitudes[i]) * smoothing
+            
+            radius = 1.0 + smoothedFftMagnitudes[i]
 
             ptr[i] = simd_float2(
                 cos(angle) * radius,
                 sin(angle) * radius
             )
         }
+    }
+}
+
+extension Collection {
+    subscript(safe index: Index) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }
