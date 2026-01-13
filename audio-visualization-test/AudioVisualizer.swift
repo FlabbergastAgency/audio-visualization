@@ -2,24 +2,10 @@ import UIKit
 import MetalKit
 import simd
 
-struct LoudnessUniform {
+struct Uniform {
     var scale: Float
     var aspectRatio: Float
-}
-
-struct RotationUniform {
-    var angle: Float
     var rotationMatrix: matrix_float2x2
-    
-    init(angle: Float) {
-        self.angle = angle
-        self.rotationMatrix = matrix_float2x2(
-            columns: (
-                simd_float2(cos(angle), sin(angle)),
-                simd_float2(-sin(angle), cos(angle))
-            )
-        )
-    }
 }
 
 class AudioVisualizer: UIView {
@@ -32,11 +18,14 @@ class AudioVisualizer: UIView {
     private var circleVertices = [simd_float2]()
     private var vertexBuffer: MTLBuffer!
     
-    private var loudnessUniformBuffer: MTLBuffer!
-    public var loudnessMagnitude: LoudnessUniform = LoudnessUniform(scale: 0.3, aspectRatio: 1.0)
+    private var uniformBuffer: MTLBuffer!
     
-    private var rotationUniformBuffer: MTLBuffer!
-    public var rotation: RotationUniform = RotationUniform(angle: 0.0)
+    public var targetScale: Float = 0.3
+    private var rotationAngle: Float = 0
+    private var smoothedScale: Float = 0.3
+    private var smoothedRotation: Float = 0
+    
+    private var lastFrameTime: CFTimeInterval = CACurrentMediaTime()
     
     public var frequencyBuffer: MTLBuffer!
     public var frequencyVertices: [simd_float2] = []
@@ -67,8 +56,9 @@ class AudioVisualizer: UIView {
         
         metalView.delegate = self
         
-        metalView.isPaused = true
+        metalView.isPaused = false
         metalView.enableSetNeedsDisplay = false
+        metalView.preferredFramesPerSecond = 60
         
         metalDevice = MTLCreateSystemDefaultDevice()
         metalView.device = metalDevice
@@ -81,18 +71,13 @@ class AudioVisualizer: UIView {
                                               length: circleVertices.count * MemoryLayout<simd_float2>.stride,
                                               options: [])!
         
-        loudnessUniformBuffer = metalDevice.makeBuffer(length: MemoryLayout<LoudnessUniform>.stride,
+        uniformBuffer = metalDevice.makeBuffer(length: MemoryLayout<Uniform>.stride,
                                                        options: [])!
-        
-        rotationUniformBuffer = metalDevice.makeBuffer(length: MemoryLayout<RotationUniform>.stride,
-                                                       options: [])
         
         frequencyVertices = Array(repeating: .zero, count: 361)
         frequencyBuffer = metalDevice.makeBuffer(bytes: frequencyVertices,
                                                  length: frequencyVertices.count * MemoryLayout<simd_float2>.stride,
                                                  options: [])!
-        
-        metalView.draw()
     }
     
     fileprivate func createPipelineState() {
@@ -129,18 +114,35 @@ extension AudioVisualizer: MTKViewDelegate {
     }
     
     func draw(in view: MTKView) {
-        loudnessMagnitude.aspectRatio = Float(metalView.drawableSize.width / metalView.drawableSize.height)
         
-        memcpy(
-            loudnessUniformBuffer.contents(),
-            &loudnessMagnitude,
-            MemoryLayout<LoudnessUniform>.stride
+        let now = CACurrentMediaTime()
+        let delta = Float(now - lastFrameTime)
+        lastFrameTime = now
+
+        let rotationSpeed: Float = 0.8
+        rotationAngle += rotationSpeed * delta
+
+        let smoothing: Float = 0.12
+        smoothedScale += (targetScale - smoothedScale) * smoothing
+        smoothedRotation += (rotationAngle - smoothedRotation) * smoothing
+
+        let rotationMatrix = matrix_float2x2(
+            columns: (
+                simd_float2(cos(smoothedRotation), sin(smoothedRotation)),
+                simd_float2(-sin(smoothedRotation), cos(smoothedRotation))
+            )
+        )
+
+        var uniform = Uniform(
+            scale: smoothedScale,
+            aspectRatio: Float(view.drawableSize.width / view.drawableSize.height),
+            rotationMatrix: rotationMatrix
         )
         
         memcpy(
-            rotationUniformBuffer.contents(),
-            &rotation,
-            MemoryLayout<RotationUniform>.stride
+            uniformBuffer.contents(),
+            &uniform,
+            MemoryLayout<Uniform>.stride
         )
 
         guard let commandBuffer = metalCommandQueue.makeCommandBuffer() else { return }
@@ -154,12 +156,11 @@ extension AudioVisualizer: MTKViewDelegate {
         renderEncoder.setRenderPipelineState(metalRenderPipelineState)
         
         renderEncoder.setVertexBuffer(vertexBuffer, offset: 0, index: 0)
-        renderEncoder.setVertexBuffer(loudnessUniformBuffer, offset: 0, index: 1)
-        renderEncoder.setVertexBuffer(rotationUniformBuffer, offset: 0, index: 2)
+        renderEncoder.setVertexBuffer(uniformBuffer, offset: 0, index: 1)
         renderEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: circleVertices.count)
         
         renderEncoder.setVertexBuffer(frequencyBuffer, offset: 0, index: 0)
-        renderEncoder.setVertexBuffer(loudnessUniformBuffer, offset: 0, index: 1)
+        renderEncoder.setVertexBuffer(uniformBuffer, offset: 0, index: 1)
         renderEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: frequencyVertices.count)
         
         renderEncoder.endEncoding()

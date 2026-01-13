@@ -8,6 +8,8 @@ class ViewController: UIViewController {
     var audioVisualizer: AudioVisualizer!
     var player: AVAudioPlayerNode!
     
+    let fftSetup = vDSP_DFT_zop_CreateSetup(nil, 2048, vDSP_DFT_Direction.FORWARD)
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         audioVisualizer = AudioVisualizer()
@@ -46,45 +48,39 @@ class ViewController: UIViewController {
             
             engine.attach(player)
             engine.connect(player, to: engine.mainMixerNode, format: format)
-            
+
             player.scheduleFile(audioFile, at: nil, completionHandler: nil)
         } catch let error {
             print(error.localizedDescription)
         }
         
-        engine.mainMixerNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { (buffer, time) in
-            self.processAudioData(buffer: buffer)
+        engine.mainMixerNode.installTap(onBus: 0, bufferSize: 2048, format: nil) { [weak self] buffer, time in
+            self?.processAudioData(buffer: buffer, time: time)
         }
         
         player.play()
     }
-    
-    var prevRMSValue: Float = 0.3
-    
-    let fftSetup = vDSP_DFT_zop_CreateSetup(nil, 1024, vDSP_DFT_Direction.FORWARD)
-    
-    func processAudioData(buffer: AVAudioPCMBuffer) {
+            
+    func processAudioData(buffer: AVAudioPCMBuffer, time: AVAudioTime) {
         guard let channelData = buffer.floatChannelData?[0] else { return }
         let frames = buffer.frameLength
-        
-        let rmsValue = SignalProcessing.rms(data: channelData, frameLength: UInt(frames))
-        let interpolatedResults = SignalProcessing.interpolate(current: rmsValue, previous: prevRMSValue)
-        prevRMSValue = rmsValue
-        
-        for rms in interpolatedResults {
-            self.audioVisualizer.loudnessMagnitude.scale = rms
-        }
         
         let fftMagnitudes = SignalProcessing.fft(
             data: channelData,
             setup: fftSetup!
         )
         
-        guard let buffer = self.audioVisualizer.frequencyBuffer else { return }
+        let loFrequency: Int = 0
+        let hiFrequency: Int = 1023
+        let frequencyBand = Array(fftMagnitudes[loFrequency...hiFrequency])
+        
+        let rmsValue = SignalProcessing.rms(data: frequencyBand, frameLength: UInt(frames))
+        audioVisualizer.targetScale = rmsValue
+        
         let count = min(fftMagnitudes.count,
                         self.audioVisualizer.frequencyVertices.count)
 
-        let ptr = buffer.contents().bindMemory(to: simd_float2.self,
+        let ptr = audioVisualizer.frequencyBuffer.contents().bindMemory(to: simd_float2.self,
                                                capacity: self.audioVisualizer.frequencyVertices.count)
 
         for i in 0..<count {
@@ -95,30 +91,6 @@ class ViewController: UIViewController {
                 cos(angle) * radius,
                 sin(angle) * radius
             )
-        }
-        
-        updateRotation()
-        
-        self.audioVisualizer.metalView.draw()
-    }
-    
-    func updateRotation() {
-        var rotationAngle: Float = 0
-        let rotationSpeed: Float = 0.8
-        var lastTimestamp: Float = 0
-        
-        if let playerNode = self.player {
-            let nodeTime = playerNode.lastRenderTime
-            let playerTime = playerNode.playerTime(forNodeTime: nodeTime!)
-            
-            let currentTime = Float(playerTime!.sampleTime) / Float(playerTime!.sampleRate)
-            let delta = currentTime - lastTimestamp
-            lastTimestamp = currentTime
-            
-            rotationAngle += rotationSpeed * delta
-            rotationAngle = fmod(rotationAngle, 2 * Float.pi)
-            
-            self.audioVisualizer.rotation = RotationUniform(angle: rotationAngle)
         }
     }
 }

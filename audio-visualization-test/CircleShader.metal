@@ -2,13 +2,9 @@
 #include <simd/simd.h>
 using namespace metal;
 
-struct LoudnessUniform {
+struct Uniform {
     float scale;
     float aspectRatio;
-};
-
-struct RotationUniform {
-    float angle;
     matrix_float2x2 rotationMatrix;
 };
 
@@ -18,16 +14,14 @@ struct VertexOut {
 };
 
 vertex VertexOut vertexShader(const constant vector_float2 *vertexArray [[buffer(0)]],
-                              const constant LoudnessUniform *loudnessUniform [[buffer(1)]],
-                              const constant RotationUniform *rotationUniform [[buffer(2)]],
+                              const constant Uniform *uniform [[buffer(1)]],
                               unsigned int vid [[vertex_id]]) {
     
-    LoudnessUniform loudnessUniformVertex = loudnessUniform[0];
-    RotationUniform rotationUniformVertex = rotationUniform[0];
+    Uniform uniformVertex = uniform[0];
     
     vector_float2 currentVertex = vertexArray[vid];
-    currentVertex = rotationUniformVertex.rotationMatrix * currentVertex * loudnessUniformVertex.scale;
-    currentVertex.x /= loudnessUniformVertex.aspectRatio;
+    currentVertex = uniformVertex.rotationMatrix * currentVertex * uniformVertex.scale;
+    currentVertex.x /= uniformVertex.aspectRatio;
         
     VertexOut output;
         

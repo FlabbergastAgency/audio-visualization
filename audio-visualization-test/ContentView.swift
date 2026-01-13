@@ -14,6 +14,8 @@ struct ViewControllerRepresentable: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: ViewController, context: Context) {
         return
     }
-    
-    typealias UIViewControllerType = ViewController
+}
+
+#Preview {
+    ContentView()
 }
