@@ -35,7 +35,7 @@ class ViewController: UIViewController {
             print(error)
         }
         
-        guard let url = Bundle.main.url(forResource: Songs.losingMyReligion.rawValue, withExtension: "mp3") else {
+        guard let url = Bundle.main.url(forResource: Songs.veridisQuo.rawValue, withExtension: "mp3") else {
             print("mp3 not found")
             return
         }
@@ -54,8 +54,8 @@ class ViewController: UIViewController {
             print(error.localizedDescription)
         }
         
-        engine.mainMixerNode.installTap(onBus: 0, bufferSize: 2048, format: nil) { [weak self] buffer, time in
-            self?.processAudioData(buffer: buffer, time: time)
+        engine.mainMixerNode.installTap(onBus: 0, bufferSize: 2048, format: nil) {  buffer, time in
+            self.processAudioData(buffer: buffer, time: time)
         }
         
         player.play()

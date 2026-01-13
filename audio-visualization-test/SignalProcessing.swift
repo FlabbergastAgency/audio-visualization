@@ -4,8 +4,8 @@ import Accelerate
 class SignalProcessing {
     static func rms(data: [Float], frameLength: UInt) -> Float {
         var val: Float = 0
-        let sizeLimitLow: Float = 0.3
-        let sizeLimitHigh: Float = 0.4
+        let sizeLimitLow: Float = 0.15
+        let sizeLimitHigh: Float = 0.3
         vDSP_measqv(data, 1, &val, min(vDSP_Length(data.count), frameLength))
         var db = 10*log10f(val)
         db = 160 + db;

@@ -20,9 +20,9 @@ class AudioVisualizer: UIView {
     
     private var uniformBuffer: MTLBuffer!
     
-    public var targetScale: Float = 0.3
+    public var targetScale: Float = 0.15
     private var rotationAngle: Float = 0
-    private var smoothedScale: Float = 0.3
+    private var smoothedScale: Float = 0.15
     private var smoothedRotation: Float = 0
     
     private var lastFrameTime: CFTimeInterval = CACurrentMediaTime()
