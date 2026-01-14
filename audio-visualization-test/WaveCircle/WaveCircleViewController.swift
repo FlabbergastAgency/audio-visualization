@@ -3,8 +3,8 @@ import AVFoundation
 import Accelerate
 import MetalKit
 
-class ViewController: UIViewController {
-    var engine: AVAudioEngine! 
+class WaveCircleViewController: UIViewController {
+    var engine: AVAudioEngine!
     var audioVisualizer: AudioVisualizer!
     var player: AVAudioPlayerNode!
     
