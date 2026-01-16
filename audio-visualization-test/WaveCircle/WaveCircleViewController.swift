@@ -7,6 +7,7 @@ class WaveCircleViewController: UIViewController {
     var engine: AVAudioEngine!
     var audioVisualizer: AudioVisualizer!
     var player: AVAudioPlayerNode!
+    var canResetVolume: Bool = false
     
     let fftSetup = vDSP_DFT_zop_CreateSetup(nil, 2048, vDSP_DFT_Direction.FORWARD)
     
@@ -25,6 +26,15 @@ class WaveCircleViewController: UIViewController {
         audioVisualizer.bottomAnchor.constraint(equalTo: view.bottomAnchor).isActive = true
         
         setupAudio()
+    }
+    
+    override func viewDidDisappear(_ animated: Bool) {
+        player.volume = 0
+        canResetVolume = true
+    }
+    
+    override func viewDidAppear(_ animated: Bool) {
+        canResetVolume ? (player.volume = 1) : ()
     }
     
     func setupAudio() {
