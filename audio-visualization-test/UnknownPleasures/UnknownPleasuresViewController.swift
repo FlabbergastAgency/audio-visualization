@@ -12,13 +12,12 @@ class UnknownPleasuresViewController: UIViewController {
     let fftSetup = vDSP_DFT_zop_CreateSetup(nil, 2048, vDSP_DFT_Direction.FORWARD)
     
     var targetFftMagnitudes: [Float] = []
-    var smoothedFftMagnitudes: [Float] = []
     let smoothing: Float = 0.4
     
-    var numberOfLines: Int = 80
-    var offsetSize: CGFloat = 5
+    var numberOfLines: Int = 50
+    var offsetSize: CGFloat = 8
     
-    let hiFrequency: Int = 400
+    let frequencyRange: Int = 100
     var rmsValue: Float = 0
     
     override func viewDidLoad() {
@@ -93,12 +92,8 @@ class UnknownPleasuresViewController: UIViewController {
             setup: fftSetup!
         )
         
-        if (smoothedFftMagnitudes.isEmpty) {
-            smoothedFftMagnitudes = targetFftMagnitudes
-        }
-        
         for i in 0..<unknownPleasures.count {
-            let frequencyBand = Array(targetFftMagnitudes[(hiFrequency / numberOfLines) * i...min((hiFrequency / numberOfLines) * (i + 1), hiFrequency)])
+            let frequencyBand = Array(targetFftMagnitudes[(frequencyRange / numberOfLines) * i...(frequencyRange / numberOfLines) * (i + 1)])
             unknownPleasures[i].rmsChanged(rms: CGFloat(SignalProcessing.rms(data: frequencyBand, frameLength: UInt(frames))))
         }
     }

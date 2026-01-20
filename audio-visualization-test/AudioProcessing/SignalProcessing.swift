@@ -4,22 +4,16 @@ import Accelerate
 class SignalProcessing {
     static func rms(data: [Float], frameLength: UInt) -> Float {
         var val: Float = 0
-        let sizeLimitLow: Float = 0.3
-        let sizeLimitHigh: Float = 0.6
         vDSP_measqv(data, 1, &val, min(vDSP_Length(data.count), frameLength))
         var db = 10*log10f(val)
-        db = 160 + db;
-        db = db - 120
-        let divider = Float(40/sizeLimitLow)
-        var adjustedVal = sizeLimitLow + db/divider
-
-        if (adjustedVal < sizeLimitLow) {
-            adjustedVal = sizeLimitLow
-        } else if (adjustedVal > sizeLimitHigh) {
-            adjustedVal = sizeLimitHigh
-        }
-
-        return adjustedVal
+        
+        let minDB: Float = -40.0
+        let maxDB: Float = 0
+        
+        let normalizedDB = min(max(db, minDB), maxDB)
+        let relativeDB = (normalizedDB - minDB) / (maxDB - minDB)
+        
+        return relativeDB
     }
     
     static func fft(data: UnsafeMutablePointer<Float>, setup: OpaquePointer) -> [Float] {
