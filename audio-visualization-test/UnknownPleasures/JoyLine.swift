@@ -1,5 +1,4 @@
 import UIKit
-import Charts
 
 class JoyLine: UIView {
     var viewWidth: CGFloat = UIScreen.main.bounds.width
@@ -19,10 +18,15 @@ class JoyLine: UIView {
     var scales: [CGFloat] = []
     var addedScales: [CGFloat] = []
     
+    var previousPoints: [CGPoint] = []
+    
     var silentStrength: CGFloat = 0.1
     
     let shapeLayer = CAShapeLayer()
-        
+    var path = CGMutablePath()
+    
+    let smoothing: Float = 0.6
+    
     override init(frame: CGRect) {
         super.init(frame: frame)
         setup()
@@ -43,6 +47,7 @@ class JoyLine: UIView {
         
         for i in 0..<numberOfControlPoints {
             points.append(drawPoint(i))
+            previousPoints = points
             scales.append(silentStrength)
             addedScales.append(0.0)
             
@@ -64,7 +69,7 @@ class JoyLine: UIView {
             scales[i] *= peakHeight
         }
                     
-        updateJoyLine()
+        createJoyLine()
         
         shapeLayer.strokeColor = UIColor.white.cgColor
         shapeLayer.fillColor = UIColor.black.cgColor
@@ -93,13 +98,9 @@ class JoyLine: UIView {
             addedScales[i] = addedScales[i - 1]
             points[i].y = offset! + addedScales[i] * -scales[i]
         }
-        
-        updateJoyLine()
     }
     
-    func updateJoyLine() {
-        
-        let path = CGMutablePath()
+    func createJoyLine() {
         
         path.move(to: points.first!)
         
@@ -107,17 +108,25 @@ class JoyLine: UIView {
             path.addLine(to: point)
         }
         
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
         shapeLayer.path = path
-        CATransaction.commit()
     }
     
-    func smoothTransition(to newPath: CGPath) {
-        let animation = CABasicAnimation(keyPath: "path")
-        animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+    func updateJoyLine() {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
         
-        shapeLayer.add(animation, forKey: "path")
+        for i in 0..<previousPoints.count {
+            previousPoints[i].y += (points[i].y - previousPoints[i].y) * CGFloat(smoothing)
+        }
+        points = previousPoints
+
+        let newPath = CGMutablePath()
+        newPath.move(to: points.first!)
+        for point in points {
+            newPath.addLine(to: point)
+        }
         shapeLayer.path = newPath
+
+        CATransaction.commit()
     }
 }

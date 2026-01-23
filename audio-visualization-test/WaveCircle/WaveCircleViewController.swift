@@ -124,3 +124,8 @@ extension Collection {
         indices.contains(index) ? self[index] : nil
     }
 }
+
+
+#Preview {
+    WaveCircleViewController()
+}

@@ -95,6 +95,7 @@ class UnknownPleasuresViewController: UIViewController {
         for i in 0..<unknownPleasures.count {
             let frequencyBand = Array(targetFftMagnitudes[(frequencyRange / numberOfLines) * i...(frequencyRange / numberOfLines) * (i + 1)])
             unknownPleasures[i].rmsChanged(rms: CGFloat(SignalProcessing.rms(data: frequencyBand, frameLength: UInt(frames))))
+            unknownPleasures[i].updateJoyLine()
         }
     }
 }
