@@ -8,29 +8,36 @@ struct Uniform {
     matrix_float2x2 rotationMatrix;
 };
 
-struct VertexOut {
-    vector_float4 position [[position]];
-    vector_float4 color;
+struct VertexIn {
+    float2 position [[attribute(0)]];
+    float2 textureCoordinate [[attribute(1)]];
 };
 
-vertex VertexOut vertexShader(const constant vector_float2 *vertexArray [[buffer(0)]],
-                              const constant Uniform *uniform [[buffer(1)]],
-                              unsigned int vid [[vertex_id]]) {
+struct VertexOut {
+    float4 position [[position]];
+    float2 textureCoordinate;
+};
+
+vertex VertexOut vertexShader(VertexIn in [[stage_in]],
+                              constant Uniform &uniform [[buffer(1)]]) {
     
-    Uniform uniformVertex = uniform[0];
+    float2 pos = in.position;
+    pos = uniform.rotationMatrix * pos * uniform.scale;
+    pos.x /= uniform.aspectRatio;
     
-    vector_float2 currentVertex = vertexArray[vid];
-    currentVertex = uniformVertex.rotationMatrix * currentVertex * uniformVertex.scale;
-    currentVertex.x /= uniformVertex.aspectRatio;
-        
-    VertexOut output;
-        
-    output.position = vector_float4(currentVertex, 0, 1);
-    output.color = vector_float4(0, 0, 0, 1);
+    VertexOut out;
+    out.position = float4(pos, 0, 1);
+    out.textureCoordinate = in.textureCoordinate;
     
-    return output;
+    return out;
 }
 
-fragment vector_float4 fragmentShader(VertexOut interpolated [[stage_in]]) {
-    return interpolated.color;
+fragment float4 fragmentShader(VertexOut in [[stage_in]],
+                               texture2d<float> albumTexture [[texture(0)]]) {
+    constexpr sampler s(filter::linear,
+                        address::clamp_to_edge);
+    
+    float4 color = albumTexture.sample(s, in.textureCoordinate);
+    
+    return color;
 }

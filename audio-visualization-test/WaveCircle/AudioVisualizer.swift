@@ -2,6 +2,11 @@ import UIKit
 import MetalKit
 import simd
 
+struct Vertex {
+    var position: simd_float2
+    var textureCoordinate: simd_float2
+}
+
 struct Uniform {
     var scale: Float
     var aspectRatio: Float
@@ -15,7 +20,7 @@ class AudioVisualizer: UIView {
     private var metalCommandQueue: MTLCommandQueue!
     private var metalRenderPipelineState: MTLRenderPipelineState!
     
-    private var circleVertices = [simd_float2]()
+    private var circleVertices: [Vertex] = []
     private var vertexBuffer: MTLBuffer!
     
     private var uniformBuffer: MTLBuffer!
@@ -29,6 +34,10 @@ class AudioVisualizer: UIView {
     
     public var frequencyBuffer: MTLBuffer!
     public var frequencyVertices: [simd_float2] = []
+    
+    private var albumTexture: MTLTexture!
+    
+    private var albumCover: UIImage = UIImage(named: "oot")!
     
     public required init() {
         super.init(frame: .zero)
@@ -68,7 +77,7 @@ class AudioVisualizer: UIView {
         createPipelineState()
         
         vertexBuffer = metalDevice.makeBuffer(bytes: circleVertices,
-                                              length: circleVertices.count * MemoryLayout<simd_float2>.stride,
+                                              length: circleVertices.count * MemoryLayout<Vertex>.stride,
                                               options: [])!
         
         uniformBuffer = metalDevice.makeBuffer(length: MemoryLayout<Uniform>.stride,
@@ -78,6 +87,8 @@ class AudioVisualizer: UIView {
         frequencyBuffer = metalDevice.makeBuffer(bytes: frequencyVertices,
                                                  length: frequencyVertices.count * MemoryLayout<simd_float2>.stride,
                                                  options: [])!
+        
+        loadAlbumTexture(image: albumCover)
     }
     
     fileprivate func createPipelineState() {
@@ -89,6 +100,8 @@ class AudioVisualizer: UIView {
         
         pipelineDescriptor.colorAttachments[0].pixelFormat = metalView.colorPixelFormat
         
+        pipelineDescriptor.vertexDescriptor = makeVertexDescriptor()
+
         metalRenderPipelineState = try! metalDevice.makeRenderPipelineState(descriptor: pipelineDescriptor)
     }
     
@@ -100,10 +113,21 @@ class AudioVisualizer: UIView {
         let origin = simd_float2(0, 0)
         
         for i in 0...720 {
-            let position : simd_float2 = [cos(rads(forDegree: Float(Float(i)/2.0))),sin(rads(forDegree: Float(Float(i)/2.0)))]
-            circleVertices.append(position)
-            if (i+1) % 2 == 0 {
-                circleVertices.append(origin)
+            let angle = Float(i) * 0.5
+            let x = cos(rads(forDegree: angle))
+            let y = sin(rads(forDegree: angle))
+            
+            let pos = simd_float2(x, y)
+            
+            let u = (x + 1) * 0.5
+            let v = 1.0 - ((y + 1) * 0.5)
+            
+            let uv = simd_float2(u, v)
+            
+            circleVertices.append(Vertex(position: pos, textureCoordinate: uv))
+            
+            if (i + 1) % 2 == 0 {
+                circleVertices.append(Vertex(position: origin, textureCoordinate: simd_float2(0.5, 0.5)))
             }
         }
     }
@@ -124,6 +148,8 @@ extension AudioVisualizer: MTKViewDelegate {
 
         let smoothing: Float = 0.12
         smoothedScale += (targetScale - smoothedScale) * smoothing
+        if smoothedScale < 0.15 { smoothedScale = 0.15 }
+        if smoothedScale > 3.0 { smoothedScale = 3.0 }
         smoothedRotation += (rotationAngle - smoothedRotation) * smoothing
 
         let rotationMatrix = matrix_float2x2(
@@ -157,6 +183,7 @@ extension AudioVisualizer: MTKViewDelegate {
         
         renderEncoder.setVertexBuffer(vertexBuffer, offset: 0, index: 0)
         renderEncoder.setVertexBuffer(uniformBuffer, offset: 0, index: 1)
+        renderEncoder.setFragmentTexture(albumTexture, index: 0)
         renderEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: circleVertices.count)
         
         renderEncoder.setVertexBuffer(frequencyBuffer, offset: 0, index: 0)
@@ -167,4 +194,34 @@ extension AudioVisualizer: MTKViewDelegate {
         commandBuffer.present(view.currentDrawable!)
         commandBuffer.commit()
     }
+    
+    func loadAlbumTexture(image: UIImage) {
+        let loader = MTKTextureLoader(device: self.metalDevice)
+        let options: [MTKTextureLoader.Option : Any] = [.SRGB: false]
+        
+        albumTexture = try? loader.newTexture(
+            cgImage: image.cgImage!,
+            options: options
+        )
+    }
+    
+    func makeVertexDescriptor() -> MTLVertexDescriptor {
+
+        let vertexDescriptor = MTLVertexDescriptor()
+
+        vertexDescriptor.attributes[0].format = .float2
+        vertexDescriptor.attributes[0].offset = 0
+        vertexDescriptor.attributes[0].bufferIndex = 0
+
+        vertexDescriptor.attributes[1].format = .float2
+        vertexDescriptor.attributes[1].offset = MemoryLayout<simd_float2>.stride
+        vertexDescriptor.attributes[1].bufferIndex = 0
+
+        vertexDescriptor.layouts[0].stride = MemoryLayout<Vertex>.stride
+        vertexDescriptor.layouts[0].stepRate = 1
+        vertexDescriptor.layouts[0].stepFunction = .perVertex
+
+        return vertexDescriptor
+    }
+
 }
